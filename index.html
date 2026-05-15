@@ -74,7 +74,18 @@
             display: flex;
             justify-content: center;
             gap: 15px;
-            min-height: 50px; /* Prevent jumping */
+            min-height: 50px;
+            position: relative;
+        }
+
+        /* We will hide specific groups via JS, but keep them in DOM */
+        .ql-toolbar-group {
+            display: none; /* Hidden by default */
+        }
+        
+        .ql-toolbar-group.active-group {
+            display: flex; /* Show when active */
+            gap: 2px;
         }
 
         .ql-toolbar.ql-snow {
@@ -83,7 +94,6 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 2px;
         }
         
         .ql-toolbar button {
@@ -94,6 +104,7 @@
             background: none;
             border: none;
             cursor: pointer;
+            font-size: 14px;
         }
 
         .ql-toolbar button:hover {
@@ -155,8 +166,8 @@
 </div>
 
 <!-- Toolbar -->
-<div class="toolbar-container">
-    <div id="toolbar-container"></div>
+<div class="toolbar-container" id="toolbar-container">
+    <!-- Groups will be injected here by JS -->
 </div>
 
 <!-- Workspace -->
@@ -171,113 +182,165 @@
 
 <script>
     // 1. Define Toolbar Configurations for Each Tab
-    const toolbarOptions = {
-    home: [
-        ['bold', 'italic', 'underline', 'strike'],       // Text formatting
-        [{ 'header': [1, 2, 3, false] }],                // Headers
-        [{ 'list': 'ordered'}, { 'list': 'bullet' }],    // Lists
-        [{ 'indent': '-1'}, { 'indent': '+1' }],         // Indent
-        ['code-block'],                                  // <--- ADDED: Code Block button
-        [{ 'color': [] }, { 'background': [] }],         // Colors
-        ['clean']
-    ],
-    insert: [
-        ['link', 'image', 'video'],                      // <--- ADDED: Link, Image, Video
-        ['blockquote'],                                  // <--- ADDED: Blockquote
-        [{ 'script': 'sub'}, { 'script': 'super' }],     // Sub/Superscript
-        ['clean']
-    ],
-    layout: [
-        [{ 'align': [] }],                               // Alignment
-        [{ 'indent': '-1'}, { 'indent': '+1' }],         // Indentation
-        [{ 'line-height': ['1', '1.15', '1.5', '2'] }], // Line Height
-        [{ 'size': ['small', false, 'large', 'huge'] }], // Font Size
-        ['clean']
-    ],
-    review: [
-        ['clean'],
-        [{ 'color': [] }],                               // Highlight
-        [{ 'font': [] }],                                // Font Family
-        ['bold', 'italic']
-    ]
-};
+    // We map each button to a specific group ID
+    const toolbarConfig = {
+        home: [
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'header': [1, 2, 3, false] }],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'indent': '-1'}, { 'indent': '+1' }],
+            ['code-block'],
+            [{ 'color': [] }, { 'background': [] }],
+            ['clean']
+        ],
+        insert: [
+            ['link', 'image', 'video'],
+            ['blockquote'],
+            [{ 'script': 'sub'}, { 'script': 'super' }],
+            ['clean']
+        ],
+        layout: [
+            [{ 'align': [] }],
+            [{ 'indent': '-1'}, { 'indent': '+1' }],
+            [{ 'line-height': ['1', '1.15', '1.5', '2'] }],
+            [{ 'size': ['small', false, 'large', 'huge'] }],
+            ['clean']
+        ],
+        review: [
+            ['clean'],
+            [{ 'color': [] }],
+            [{ 'font': [] }],
+            ['bold', 'italic']
+        ]
+    };
 
-    // 2. Initialize Quill
+    // Helper to generate HTML for a specific toolbar group
+    function createToolbarGroup(groupName, options) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = `ql-toolbar-group ${groupName === 'home' ? 'active-group' : ''}`;
+        groupDiv.id = `group-${groupName}`;
+
+        options.forEach(item => {
+            if (Array.isArray(item)) {
+                // Dropdowns (e.g., header, list, color)
+                const key = Object.keys(item)[0];
+                const values = item[key];
+                
+                // Special handling for Header
+                if (key === 'header') {
+                    values.forEach(val => {
+                        const btn = document.createElement('button');
+                        btn.className = `ql-header ${val === false ? '' : val}`;
+                        btn.innerHTML = val === false ? '<span></span>' : `<span>${val}</span>`;
+                        btn.onclick = () => quill.format('header', val || false);
+                        groupDiv.appendChild(btn);
+                    });
+                } 
+                // Special handling for List
+                else if (key === 'list') {
+                    ['ordered', 'bullet'].forEach(type => {
+                        const btn = document.createElement('button');
+                        btn.className = `ql-${type}`;
+                        btn.innerHTML = type === 'ordered' ? '1.' : '•';
+                        btn.onclick = () => quill.format('list', type === 'ordered' ? 'ordered' : 'bullet');
+                        groupDiv.appendChild(btn);
+                    });
+                }
+                // Special handling for Color/Background
+                else if (key === 'color' || key === 'background') {
+                     const btn = document.createElement('button');
+                     btn.className = `ql-${key}`;
+                     btn.innerHTML = `<span style="display:inline-block;width:12px;height:12px;background:${key==='color'?'black':'white'};border:1px solid #ccc;"></span>`;
+                     btn.onclick = () => {
+                         // Quill color picker requires a specific input, simplified here for demo
+                         // In a real app, you'd use the built-in picker logic
+                         alert(`Color picker for ${key} would open here.`);
+                     };
+                     groupDiv.appendChild(btn);
+                }
+                // Special handling for Align
+                else if (key === 'align') {
+                    ['left', 'center', 'right', 'justify'].forEach(align => {
+                        const btn = document.createElement('button');
+                        btn.className = `ql-align ${align === 'left' ? '' : align}`;
+                        btn.innerHTML = align === 'left' ? '⬅️' : (align === 'center' ? '↔️' : (align === 'right' ? '➡️' : '≡'));
+                        btn.onclick = () => quill.format('align', align === 'left' ? false : align);
+                        groupDiv.appendChild(btn);
+                    });
+                }
+                // Special handling for Font
+                else if (key === 'font') {
+                    const btn = document.createElement('button');
+                    btn.className = `ql-font`;
+                    btn.innerHTML = 'Aa';
+                    btn.onclick = () => quill.format('font', 'serif'); // Simplified
+                    groupDiv.appendChild(btn);
+                }
+                // Special handling for Size
+                else if (key === 'size') {
+                    values.forEach(size => {
+                        const btn = document.createElement('button');
+                        btn.className = `ql-size ${size === false ? '' : size}`;
+                        btn.innerHTML = size === false ? 'Normal' : (size === 'small' ? 'S' : (size === 'large' ? 'L' : 'Huge'));
+                        btn.onclick = () => quill.format('size', size || false);
+                        groupDiv.appendChild(btn);
+                    });
+                }
+            } else {
+                // Simple buttons (bold, italic, clean, etc.)
+                const btn = document.createElement('button');
+                btn.className = `ql-${item}`;
+                // Add icons/text based on button type
+                const icons = {
+                    'bold': 'B', 'italic': 'I', 'underline': 'U', 'strike': 'S',
+                    'clean': '🧹', 'code-block': '</>', 'blockquote': '"',
+                    'link': '🔗', 'image': '🖼️', 'video': '▶️'
+                };
+                btn.innerHTML = icons[item] || item;
+                btn.onclick = () => quill.format(item, true);
+                groupDiv.appendChild(btn);
+            }
+        });
+
+        return groupDiv;
+    }
+
+    // 2. Initialize Quill with a minimal toolbar (we'll inject our custom one)
     var quill = new Quill('#editor-container', {
         theme: 'snow',
         modules: {
-            toolbar: toolbarOptions.home // Default to Home tab
+            toolbar: false // Disable default toolbar
         },
         placeholder: 'The Chronicles of Animalandia\n\nWelcome to the archives of Maku. Here lies the history of the Lion King, the Snow Leopard, and the tales of the wolves Lupus and Grevan.\n\nWhat riddle shall we solve today?'
     });
 
-    // 3. Tab Switching Logic
+    // 3. Build the Toolbar Groups Dynamically
+    const toolbarContainer = document.getElementById('toolbar-container');
+    
+    Object.keys(toolbarConfig).forEach(key => {
+        const groupEl = createToolbarGroup(key, toolbarConfig[key]);
+        toolbarContainer.appendChild(groupEl);
+    });
+
+    // 4. Tab Switching Logic (Fixed!)
     const tabs = document.querySelectorAll('.tab-btn');
-    const toolbarDiv = document.getElementById('toolbar-container');
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            // Update Visual Active State
+            // Update Visual Active State of Tabs
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
 
-            // Get the tab name
             const tabName = tab.dataset.tab;
 
-            // Update Toolbar
-            // We must destroy the old toolbar module and create a new one with the new config
-            quill.getModule('toolbar').container.innerHTML = ''; // Clear existing buttons
+            // Toggle Toolbar Groups Visibility
+            const groups = document.querySelectorAll('.ql-toolbar-group');
+            groups.forEach(g => g.classList.remove('active-group'));
             
-            // Re-initialize toolbar with new config
-            quill.theme.modules.toolbar = new quill.theme.modules.Toolbar(toolbarOptions[tabName]);
-            quill.theme.modules.toolbar.bind();
-            
-            // Note: Quill doesn't have a simple "setToolbar" method, so we rebuild the DOM elements
-            // This is a workaround to swap the buttons dynamically
-            toolbarDiv.innerHTML = '';
-            const newToolbar = document.createElement('div');
-            newToolbar.className = 'ql-toolbar ql-snow';
-            
-            // Rebuild buttons based on config
-            toolbarOptions[tabName].forEach(group => {
-                const groupDiv = document.createElement('span');
-                group.forEach(button => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    if (Array.isArray(button)) {
-                        const label = Object.keys(button);
-                        const value = button[label];
-                        if (label === 'header') {
-                            value.forEach((h, i) => {
-                                const hBtn = document.createElement('button');
-                                hBtn.className = `ql-header ${h === false ? '' : h}`;
-                                hBtn.innerHTML = h === false ? '<span></span>' : `<span>${h}</span>`;
-                                hBtn.onclick = () => quill.format('header', h || false);
-                                groupDiv.appendChild(hBtn);
-                            });
-                        } else if (label === 'list') {
-                            ['ordered', 'bullet'].forEach(type => {
-                                const lBtn = document.createElement('button');
-                                lBtn.className = `ql-${type}`;
-                                lBtn.onclick = () => quill.format('list', type === 'ordered' ? 'ordered' : 'bullet');
-                                groupDiv.appendChild(lBtn);
-                            });
-                        }
-                        // Add more complex logic here if needed for other dropdowns
-                    } else {
-                        btn.className = `ql-${button}`;
-                        btn.onclick = () => quill.format(button, true);
-                        groupDiv.appendChild(btn);
-                    }
-                });
-                newToolbar.appendChild(groupDiv);
-            });
-
-            toolbarDiv.appendChild(newToolbar);
-            
-            // Re-bind the toolbar module to the new elements
-            quill.theme.modules.toolbar = new quill.theme.modules.Toolbar(newToolbar);
-            quill.theme.modules.toolbar.bind();
+            const activeGroup = document.getElementById(`group-${tabName}`);
+            if (activeGroup) {
+                activeGroup.classList.add('active-group');
+            }
         });
     });
 

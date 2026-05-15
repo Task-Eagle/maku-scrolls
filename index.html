@@ -66,7 +66,7 @@
             text-decoration: none;
         }
 
-        /* 3. The Toolbar Area */
+        /* 3. The Toolbar Area - COMPLETELY REWRITTEN */
         .toolbar-container {
             background: white;
             border-bottom: 1px solid #dcdcdc;
@@ -77,21 +77,24 @@
             min-height: 50px;
             position: relative;
             width: 100%;
+            box-sizing: border-box;
         }
 
-        /* CRITICAL FIX: Ensure groups are hidden by default */
-        .ql-toolbar-group {
-            display: none !important; 
-        }
-        
-        /* CRITICAL FIX: Ensure active group is visible */
-        .ql-toolbar-group.active-group {
-            display: flex !important;
+        /* We create our own toolbar groups that mimic Quill's look but ignore its internal logic */
+        .custom-toolbar-group {
+            display: none; /* Hidden by default */
+            flex-wrap: wrap;
             gap: 2px;
             align-items: center;
+            padding: 2px;
+            border-radius: 4px;
         }
 
-        .ql-toolbar-group button {
+        .custom-toolbar-group.active-group {
+            display: flex !important; /* Force visible */
+        }
+
+        .custom-toolbar-group button {
             margin: 0;
             padding: 4px 8px;
             border-radius: 3px;
@@ -102,16 +105,19 @@
             font-size: 14px;
             min-width: 24px;
             text-align: center;
+            font-family: inherit;
+            transition: all 0.2s;
         }
 
-        .ql-toolbar-group button:hover {
+        .custom-toolbar-group button:hover {
             background-color: #f0f0f0;
             color: #2b579a;
         }
 
-        .ql-toolbar-group button.ql-active {
+        .custom-toolbar-group button.ql-active {
             color: #2b579a;
             background-color: #e6f0ff;
+            font-weight: bold;
         }
 
         /* 4. The Editor "Paper" */
@@ -132,6 +138,7 @@
             padding: 25mm 20mm;
             box-sizing: border-box;
             border: 1px solid #dcdcdc;
+            outline: none;
         }
 
         /* 5. Typography */
@@ -141,11 +148,22 @@
             line-height: 1.5;
             padding: 0;
             color: #000;
+            min-height: 100%;
         }
 
         .ql-editor h1 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 16pt; font-weight: bold; color: #2b579a; }
         .ql-editor h2 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 13pt; font-weight: bold; }
         .ql-editor h3 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 12pt; font-weight: bold; }
+        
+        /* Fix for placeholder visibility */
+        .ql-editor.ql-blank::before {
+            color: #aaa;
+            font-style: normal;
+            content: attr(data-placeholder);
+            float: left;
+            height: 0;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -164,7 +182,7 @@
 
 <!-- Toolbar Container -->
 <div class="toolbar-container" id="toolbar-container">
-    <!-- Buttons will be injected here -->
+    <!-- Buttons injected here -->
 </div>
 
 <!-- Workspace -->
@@ -223,9 +241,10 @@
     function createButton(format, value, label) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `ql-${format}`;
+        // We use a custom class to avoid Quill's internal styling conflicts
+        btn.className = `custom-btn ql-${format}`;
         if (value && value !== true) {
-            btn.classList.add(value);
+            btn.dataset.value = value;
         }
         
         // Set content
@@ -240,6 +259,12 @@
         // Click handler
         btn.onclick = (e) => {
             e.preventDefault();
+            e.stopPropagation(); // Stop bubbling
+            
+            // Update active state visually
+            document.querySelectorAll('.custom-toolbar-group button').forEach(b => b.classList.remove('ql-active'));
+            btn.classList.add('ql-active');
+
             if (format === 'header') {
                 quill.format('header', value || false);
             } else if (format === 'list') {
@@ -250,7 +275,18 @@
                 quill.format('size', value || false);
             } else if (format === 'color' || format === 'background') {
                 // Placeholder for color picker logic
-                alert(`Color picker for ${format} triggered! (Value: ${value})`);
+                // In a real app, you'd use a color picker library
+                const color = prompt(`Enter hex color for ${format}:`, '#000000');
+                if(color) quill.format(format, color);
+            } else if (format === 'link') {
+                const url = prompt('Enter URL:', 'https://');
+                if(url) quill.format('link', url);
+            } else if (format === 'image') {
+                const url = prompt('Enter image URL:', 'https://');
+                if(url) quill.format('image', url);
+            } else if (format === 'video') {
+                const url = prompt('Enter video URL:', 'https://');
+                if(url) quill.format('video', url);
             } else {
                 quill.format(format, true);
             }
@@ -261,7 +297,7 @@
     // 3. Helper to create a group
     function createToolbarGroup(name, options) {
         const groupDiv = document.createElement('div');
-        groupDiv.className = 'ql-toolbar-group';
+        groupDiv.className = 'custom-toolbar-group';
         groupDiv.id = `group-${name}`;
 
         options.forEach(item => {
@@ -295,7 +331,7 @@
     var quill = new Quill('#editor-container', {
         theme: 'snow',
         modules: { toolbar: false }, // We build our own
-        placeholder: 'The Chronicles of Animalandia...\n\nWelcome to the archives of Maku.'
+        placeholder: 'The Chronicles of Animalandia\n\nWelcome to the archives of Maku. Here lies the history of the Lion King, the Snow Leopard, and the tales of the wolves Lupus and Grevan.\n\nWhat riddle shall we solve today?'
     });
 
     // 5. Build and Inject Toolbar Groups
@@ -308,7 +344,10 @@
     });
 
     // 6. Activate "Home" by default
-    document.getElementById('group-home').classList.add('active-group');
+    const homeGroup = document.getElementById('group-home');
+    if(homeGroup) {
+        homeGroup.classList.add('active-group');
+    }
 
     // 7. Tab Switching Logic
     const tabs = document.querySelectorAll('.tab-btn');
@@ -321,7 +360,7 @@
             const targetTab = tab.dataset.tab;
             
             // Hide all groups
-            document.querySelectorAll('.ql-toolbar-group').forEach(g => g.classList.remove('active-group'));
+            document.querySelectorAll('.custom-toolbar-group').forEach(g => g.classList.remove('active-group'));
             
             // Show target group
             const targetGroup = document.getElementById(`group-${targetTab}`);

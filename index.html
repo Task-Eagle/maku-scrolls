@@ -76,27 +76,22 @@
             gap: 15px;
             min-height: 50px;
             position: relative;
+            width: 100%;
         }
 
-        /* We will hide specific groups via JS, but keep them in DOM */
+        /* CRITICAL FIX: Ensure groups are hidden by default */
         .ql-toolbar-group {
-            display: none; /* Hidden by default */
+            display: none !important; 
         }
         
+        /* CRITICAL FIX: Ensure active group is visible */
         .ql-toolbar-group.active-group {
-            display: flex; /* Show when active */
+            display: flex !important;
             gap: 2px;
+            align-items: center;
         }
 
-        .ql-toolbar.ql-snow {
-            border: none !important;
-            padding: 0 !important;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
-        .ql-toolbar button {
+        .ql-toolbar-group button {
             margin: 0;
             padding: 4px 8px;
             border-radius: 3px;
@@ -105,14 +100,16 @@
             border: none;
             cursor: pointer;
             font-size: 14px;
+            min-width: 24px;
+            text-align: center;
         }
 
-        .ql-toolbar button:hover {
+        .ql-toolbar-group button:hover {
             background-color: #f0f0f0;
             color: #2b579a;
         }
 
-        .ql-toolbar button.ql-active {
+        .ql-toolbar-group button.ql-active {
             color: #2b579a;
             background-color: #e6f0ff;
         }
@@ -165,9 +162,9 @@
     <button id="save-btn" style="background: white; color: #2b579a; border: 1px solid #ccc; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">Save .docx</button>
 </div>
 
-<!-- Toolbar -->
+<!-- Toolbar Container -->
 <div class="toolbar-container" id="toolbar-container">
-    <!-- Groups will be injected here by JS -->
+    <!-- Buttons will be injected here -->
 </div>
 
 <!-- Workspace -->
@@ -181,8 +178,7 @@
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
 <script>
-    // 1. Define Toolbar Configurations for Each Tab
-    // We map each button to a specific group ID
+    // 1. Configuration
     const toolbarConfig = {
         home: [
             ['bold', 'italic', 'underline', 'strike'],
@@ -214,167 +210,147 @@
         ]
     };
 
-    // Helper to generate HTML for a specific toolbar group
-    function createToolbarGroup(groupName, options) {
+    // Icons mapping
+    const icons = {
+        'bold': 'B', 'italic': 'I', 'underline': 'U', 'strike': 'S',
+        'clean': '🧹', 'code-block': '</>', 'blockquote': '"',
+        'link': '🔗', 'image': '🖼️', 'video': '▶️',
+        'ordered': '1.', 'bullet': '•', 'header': 'H',
+        'indent': '⇥', 'align': '≡', 'size': 'A', 'font': 'Aa'
+    };
+
+    // 2. Helper to create a button
+    function createButton(format, value, label) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `ql-${format}`;
+        if (value && value !== true) {
+            btn.classList.add(value);
+        }
+        
+        // Set content
+        if (label) {
+            btn.innerHTML = `<span>${label}</span>`;
+        } else if (icons[format]) {
+            btn.innerHTML = `<span>${icons[format]}</span>`;
+        } else {
+            btn.innerHTML = `<span>${format}</span>`;
+        }
+
+        // Click handler
+        btn.onclick = (e) => {
+            e.preventDefault();
+            if (format === 'header') {
+                quill.format('header', value || false);
+            } else if (format === 'list') {
+                quill.format('list', value === 'ordered' ? 'ordered' : 'bullet');
+            } else if (format === 'align') {
+                quill.format('align', value === 'left' ? false : value);
+            } else if (format === 'size') {
+                quill.format('size', value || false);
+            } else if (format === 'color' || format === 'background') {
+                // Placeholder for color picker logic
+                alert(`Color picker for ${format} triggered! (Value: ${value})`);
+            } else {
+                quill.format(format, true);
+            }
+        };
+        return btn;
+    }
+
+    // 3. Helper to create a group
+    function createToolbarGroup(name, options) {
         const groupDiv = document.createElement('div');
-        groupDiv.className = `ql-toolbar-group ${groupName === 'home' ? 'active-group' : ''}`;
-        groupDiv.id = `group-${groupName}`;
+        groupDiv.className = 'ql-toolbar-group';
+        groupDiv.id = `group-${name}`;
 
         options.forEach(item => {
             if (Array.isArray(item)) {
-                // Dropdowns (e.g., header, list, color)
                 const key = Object.keys(item)[0];
                 const values = item[key];
-                
-                // Special handling for Header
+
                 if (key === 'header') {
-                    values.forEach(val => {
-                        const btn = document.createElement('button');
-                        btn.className = `ql-header ${val === false ? '' : val}`;
-                        btn.innerHTML = val === false ? '<span></span>' : `<span>${val}</span>`;
-                        btn.onclick = () => quill.format('header', val || false);
-                        groupDiv.appendChild(btn);
-                    });
-                } 
-                // Special handling for List
-                else if (key === 'list') {
-                    ['ordered', 'bullet'].forEach(type => {
-                        const btn = document.createElement('button');
-                        btn.className = `ql-${type}`;
-                        btn.innerHTML = type === 'ordered' ? '1.' : '•';
-                        btn.onclick = () => quill.format('list', type === 'ordered' ? 'ordered' : 'bullet');
-                        groupDiv.appendChild(btn);
-                    });
-                }
-                // Special handling for Color/Background
-                else if (key === 'color' || key === 'background') {
-                     const btn = document.createElement('button');
-                     btn.className = `ql-${key}`;
-                     btn.innerHTML = `<span style="display:inline-block;width:12px;height:12px;background:${key==='color'?'black':'white'};border:1px solid #ccc;"></span>`;
-                     btn.onclick = () => {
-                         // Quill color picker requires a specific input, simplified here for demo
-                         // In a real app, you'd use the built-in picker logic
-                         alert(`Color picker for ${key} would open here.`);
-                     };
-                     groupDiv.appendChild(btn);
-                }
-                // Special handling for Align
-                else if (key === 'align') {
-                    ['left', 'center', 'right', 'justify'].forEach(align => {
-                        const btn = document.createElement('button');
-                        btn.className = `ql-align ${align === 'left' ? '' : align}`;
-                        btn.innerHTML = align === 'left' ? '⬅️' : (align === 'center' ? '↔️' : (align === 'right' ? '➡️' : '≡'));
-                        btn.onclick = () => quill.format('align', align === 'left' ? false : align);
-                        groupDiv.appendChild(btn);
-                    });
-                }
-                // Special handling for Font
-                else if (key === 'font') {
-                    const btn = document.createElement('button');
-                    btn.className = `ql-font`;
-                    btn.innerHTML = 'Aa';
-                    btn.onclick = () => quill.format('font', 'serif'); // Simplified
-                    groupDiv.appendChild(btn);
-                }
-                // Special handling for Size
-                else if (key === 'size') {
-                    values.forEach(size => {
-                        const btn = document.createElement('button');
-                        btn.className = `ql-size ${size === false ? '' : size}`;
-                        btn.innerHTML = size === false ? 'Normal' : (size === 'small' ? 'S' : (size === 'large' ? 'L' : 'Huge'));
-                        btn.onclick = () => quill.format('size', size || false);
-                        groupDiv.appendChild(btn);
-                    });
+                    values.forEach(v => groupDiv.appendChild(createButton('header', v, v === false ? '' : v)));
+                } else if (key === 'list') {
+                    ['ordered', 'bullet'].forEach(type => groupDiv.appendChild(createButton('list', type, type === 'ordered' ? '1.' : '•')));
+                } else if (key === 'align') {
+                    ['left', 'center', 'right', 'justify'].forEach(a => groupDiv.appendChild(createButton('align', a, a === 'left' ? '⬅️' : (a === 'center' ? '↔️' : (a === 'right' ? '➡️' : '≡')))));
+                } else if (key === 'size') {
+                    values.forEach(s => groupDiv.appendChild(createButton('size', s, s === false ? 'N' : (s === 'small' ? 'S' : (s === 'large' ? 'L' : 'H')))));
+                } else if (key === 'font') {
+                    groupDiv.appendChild(createButton('font', 'serif', 'Aa'));
+                } else if (key === 'color' || key === 'background') {
+                    groupDiv.appendChild(createButton(key, null, key === 'color' ? '🎨' : '🖌️'));
                 }
             } else {
-                // Simple buttons (bold, italic, clean, etc.)
-                const btn = document.createElement('button');
-                btn.className = `ql-${item}`;
-                // Add icons/text based on button type
-                const icons = {
-                    'bold': 'B', 'italic': 'I', 'underline': 'U', 'strike': 'S',
-                    'clean': '🧹', 'code-block': '</>', 'blockquote': '"',
-                    'link': '🔗', 'image': '🖼️', 'video': '▶️'
-                };
-                btn.innerHTML = icons[item] || item;
-                btn.onclick = () => quill.format(item, true);
-                groupDiv.appendChild(btn);
+                // Simple button
+                groupDiv.appendChild(createButton(item, true, null));
             }
         });
 
         return groupDiv;
     }
 
-    // 2. Initialize Quill with a minimal toolbar (we'll inject our custom one)
+    // 4. Initialize Quill
     var quill = new Quill('#editor-container', {
         theme: 'snow',
-        modules: {
-            toolbar: false // Disable default toolbar
-        },
-        placeholder: 'The Chronicles of Animalandia\n\nWelcome to the archives of Maku. Here lies the history of the Lion King, the Snow Leopard, and the tales of the wolves Lupus and Grevan.\n\nWhat riddle shall we solve today?'
+        modules: { toolbar: false }, // We build our own
+        placeholder: 'The Chronicles of Animalandia...\n\nWelcome to the archives of Maku.'
     });
 
-    // 3. Build the Toolbar Groups Dynamically
+    // 5. Build and Inject Toolbar Groups
     const toolbarContainer = document.getElementById('toolbar-container');
     
     Object.keys(toolbarConfig).forEach(key => {
-        const groupEl = createToolbarGroup(key, toolbarConfig[key]);
-        toolbarContainer.appendChild(groupEl);
+        const group = createToolbarGroup(key, toolbarConfig[key]);
+        toolbarContainer.appendChild(group);
+        console.log(`Created group: ${key} with ${toolbarConfig[key].length} items`);
     });
 
-    // 4. Tab Switching Logic (Fixed!)
-    const tabs = document.querySelectorAll('.tab-btn');
+    // 6. Activate "Home" by default
+    document.getElementById('group-home').classList.add('active-group');
 
+    // 7. Tab Switching Logic
+    const tabs = document.querySelectorAll('.tab-btn');
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            // Update Visual Active State of Tabs
+            // Update Tab UI
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
 
-            const tabName = tab.dataset.tab;
-
-            // Toggle Toolbar Groups Visibility
-            const groups = document.querySelectorAll('.ql-toolbar-group');
-            groups.forEach(g => g.classList.remove('active-group'));
+            const targetTab = tab.dataset.tab;
             
-            const activeGroup = document.getElementById(`group-${tabName}`);
-            if (activeGroup) {
-                activeGroup.classList.add('active-group');
+            // Hide all groups
+            document.querySelectorAll('.ql-toolbar-group').forEach(g => g.classList.remove('active-group'));
+            
+            // Show target group
+            const targetGroup = document.getElementById(`group-${targetTab}`);
+            if (targetGroup) {
+                targetGroup.classList.add('active-group');
+            } else {
+                console.error(`Group for ${targetTab} not found!`);
             }
         });
     });
 
-    // Save Functionality
+    // 8. Save Functionality
     document.getElementById('save-btn').addEventListener('click', function() {
         var htmlContent = quill.root.innerHTML;
-        
         var fullHtml = `
             <!DOCTYPE html>
             <html>
-            <head>
-                <meta charset="utf-8">
-                <title>Maku's Scrolls</title>
-                <style>
-                    body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 1.5; margin: 0; padding: 25mm 20mm; color: #000; }
-                    h1 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 16pt; font-weight: bold; color: #2b579a; }
-                    h2 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 13pt; font-weight: bold; }
-                    h3 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 12pt; font-weight: bold; }
-                    .maku-footer { text-align: center; font-family: 'Times New Roman', serif; font-style: italic; color: #888; font-size: 10pt; margin-top: 50px; border-top: 1px solid #eee; padding-top: 10px; }
-                </style>
-            </head>
-            <body>
-                ${htmlContent}
-                <div class="maku-footer">Archived by Maku | Animalandia</div>
-            </body>
-            </html>
+            <head><meta charset="utf-8"><title>Maku's Scrolls</title>
+            <style>body{font-family:'Calibri',sans-serif;font-size:11pt;line-height:1.5;margin:0;padding:25mm 20mm;color:#000;}
+            h1{font-size:16pt;font-weight:bold;color:#2b579a;}h2{font-size:13pt;font-weight:bold;}h3{font-size:12pt;font-weight:bold;}
+            .maku-footer{text-align:center;font-family:'Times New Roman',serif;font-style:italic;color:#888;font-size:10pt;margin-top:50px;border-top:1px solid #eee;padding-top:10px;}</style>
+            </head><body>${htmlContent}<div class="maku-footer">Archived by Maku | Animalandia</div></body></html>
         `;
-
         try {
             var converted = htmlDocx.asBlob(fullHtml);
             saveAs(converted, 'Maku_Scrolls_Animalandia.docx');
-            console.log("Document saved successfully!");
+            console.log("Saved!");
         } catch (e) {
-            alert("Oh dear! There was an issue saving the scroll. Check the console for details.");
+            alert("Error saving: " + e.message);
             console.error(e);
         }
     });

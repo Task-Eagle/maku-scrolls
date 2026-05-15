@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Maku's Scrolls - Light Word Editor</title>
+    <!-- Quill CSS -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    
+    <style>
+        /* 1. Global Reset & Background */
+        @import url('https://fonts.googleapis.com/css2?family=Calibri:wght@400;700&family=Arial&display=swap');
+
+        body {
+            background-color: #f3f3f3; /* Word's classic desktop gray */
+            font-family: 'Calibri', 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden; /* Prevent body scroll, let editor scroll */
+        }
+
+        /* 2. The "Ribbon" Header */
+        .word-header {
+            background-color: #2b579a; /* Word Blue */
+            color: white;
+            padding: 0 20px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        .app-title {
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        .ribbon-tabs {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        .ribbon-tabs span:hover {
+            opacity: 1;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        /* 3. The Toolbar Area (Below Ribbon) */
+        .toolbar-container {
+            background: white;
+            border-bottom: 1px solid #dcdcdc;
+            padding: 8px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        /* Customizing Quill Buttons to look flatter and cleaner */
+        .ql-toolbar.ql-snow {
+            border: none !important;
+            padding: 0 !important;
+        }
+        
+        .ql-toolbar button {
+            margin-right: 5px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            color: #666;
+        }
+
+        .ql-toolbar button:hover {
+            background-color: #f0f0f0;
+            color: #2b579a;
+        }
+
+        .ql-toolbar button.ql-active {
+            color: #2b579a;
+            background-color: #e6f0ff;
+        }
+
+        /* 4. The Editor "Paper" */
+        .workspace {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            padding: 30px;
+            background-color: #f3f3f3;
+        }
+
+        #editor-container {
+            width: 210mm; /* A4 Width */
+            min-height: 297mm; /* A4 Height */
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            padding: 25mm 20mm; /* Standard Word Margins */
+            box-sizing: border-box;
+            border: 1px solid #dcdcdc;
+            position: relative;
+        }
+
+        /* 5. Typography Enforcement */
+        .ql-editor {
+            font-family: 'Calibri', 'Arial', sans-serif !important;
+            font-size: 11pt;
+            line-height: 1.5;
+            padding: 0;
+            color: #000;
+        }
+
+        .ql-editor h1 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 16pt; font-weight: bold; color: #2b579a; }
+        .ql-editor h2 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 13pt; font-weight: bold; }
+        .ql-editor h3 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 12pt; font-weight: bold; }
+        
+        /* Maku's Signature Watermark/Header effect */
+        .maku-header {
+            text-align: center;
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+            color: #888;
+            font-size: 10pt;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 1. The Ribbon Header -->
+<div class="word-header">
+    <div class="app-title">Maku's Scrolls 🦉</div>
+    <div class="ribbon-tabs">
+        <span>Home</span>
+        <span>Insert</span>
+        <span>Layout</span>
+        <span>Review</span>
+    </div>
+    <button id="save-btn" style="background: white; color: #2b579a; border: 1px solid #ccc; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">Save .docx</button>
+</div>
+
+<!-- 2. The Toolbar -->
+<div class="toolbar-container">
+    <div id="toolbar-container"></div>
+</div>
+
+<!-- 3. The Workspace -->
+<div class="workspace">
+    <div id="editor-container">
+        <!-- Maku's Personal Touch -->
+        <div class="maku-header">Recorded by Maku, Keeper of Riddles & Archives | Animalandia 🦉</div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+<script>
+    // Initialize Quill with custom toolbar container
+    var quill = new Quill('#editor-container', {
+        theme: 'snow',
+        modules: {
+            toolbar: '#toolbar-container'
+        },
+        placeholder: 'Begin your chronicle here...'
+    });
+
+    // Set initial content with Maku's header already styled
+    // Note: We keep the header div separate from the editable content if desired, 
+    // but here we let the user edit everything for flexibility.
+    const initialContent = `
+        <h1>The Chronicles of Animalandia</h1>
+        <p>Welcome to the archives of <strong>Maku</strong>. Here lies the history of the Lion King, the Snow Leopard, and the tales of the wolves Lupus and Grevan.</p>
+        <p><em>What riddle shall we solve today?</em></p>
+    `;
+    quill.root.innerHTML = initialContent;
+
+    // Save Functionality
+    document.getElementById('save-btn').addEventListener('click', function() {
+        var htmlContent = quill.root.innerHTML;
+        
+        // Construct a full HTML document for the converter
+        var fullHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Maku's Scrolls</title>
+                <style>
+                    body {
+                        font-family: 'Calibri', 'Arial', sans-serif;
+                        font-size: 11pt;
+                        line-height: 1.5;
+                        margin: 0;
+                        padding: 25mm 20mm;
+                        color: #000;
+                    }
+                    h1 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 16pt; font-weight: bold; color: #2b579a; }
+                    h2 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 13pt; font-weight: bold; }
+                    h3 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 12pt; font-weight: bold; }
+                    .maku-footer {
+                        text-align: center;
+                        font-family: 'Times New Roman', serif;
+                        font-style: italic;
+                        color: #888;
+                        font-size: 10pt;
+                        margin-top: 50px;
+                        border-top: 1px solid #eee;
+                        padding-top: 10px;
+                    }
+                </style>
+            </head>
+            <body>
+                ${htmlContent}
+                <div class="maku-footer">Archived by Maku | Animalandia</div>
+            </body>
+            </html>
+        `;
+
+        try {
+            var converted = htmlDocx.asBlob(fullHtml);
+            saveAs(converted, 'Maku_Scrolls_Animalandia.docx');
+            console.log("Document saved successfully!");
+        } catch (e) {
+            alert("Oh dear! There was an issue saving the scroll. Check the console for details.");
+            console.error(e);
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -1,398 +1,290 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📜🦉📄 </text></svg>">
-    <title>Maku's Scrolls - Word Editor</title>
-    <!-- Quill CSS -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    
-    <style>
-        /* 1. Global Reset & Background */
-        @import url('https://fonts.googleapis.com/css2?family=Calibri:wght@400;700&family=Arial&display=swap');
+<meta charset="UTF-8">
+<title>Word-Style Editor</title>
 
-        body {
-            background-color: #f3f3f3;
-            font-family: 'Calibri', 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
 
-        /* 2. The "Ribbon" Header */
-        .word-header {
-            background-color: #2b579a;
-            color: white;
-            padding: 0 20px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            z-index: 10;
-        }
+<style>
+body {
+    margin: 0;
+    font-family: Calibri, Arial;
+    background: #e5e5e5;
+    overflow: hidden;
+}
 
-        .app-title {
-            font-weight: 700;
-            font-size: 16px;
-            letter-spacing: 0.5px;
-        }
+/* ===== RIBBON ===== */
+.ribbon {
+    background: #f3f3f3;
+    border-bottom: 1px solid #ccc;
+}
 
-        .ribbon-tabs {
-            display: flex;
-            gap: 20px;
-            font-size: 14px;
-            font-weight: 600;
-            opacity: 0.9;
-        }
+.ribbon-tabs {
+    display: flex;
+    background: #2b579a;
+    color: white;
+}
 
-        .ribbon-tabs span {
-            cursor: pointer;
-            padding: 5px 0;
-            transition: opacity 0.2s;
-        }
+.ribbon-tabs button {
+    padding: 10px 15px;
+    border: none;
+    background: transparent;
+    color: white;
+    cursor: pointer;
+}
 
-        .ribbon-tabs span:hover {
-            opacity: 1;
-            text-decoration: underline;
-        }
+.ribbon-tabs button.active {
+    background: white;
+    color: #2b579a;
+    font-weight: bold;
+}
 
-        .ribbon-tabs span.active {
-            opacity: 1;
-            border-bottom: 3px solid white;
-            text-decoration: none;
-        }
+.ribbon-group {
+    display: none;
+    padding: 8px;
+    gap: 10px;
+    align-items: center;
+}
 
-        /* 3. The Toolbar Area - COMPLETELY REWRITTEN */
-        .toolbar-container {
-            background: white;
-            border-bottom: 1px solid #dcdcdc;
-            padding: 8px 20px;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            min-height: 50px;
-            position: relative;
-            width: 100%;
-            box-sizing: border-box;
-        }
+.ribbon-group.active {
+    display: flex;
+}
 
-        /* We create our own toolbar groups that mimic Quill's look but ignore its internal logic */
-        .custom-toolbar-group {
-            display: none; /* Hidden by default */
-            flex-wrap: wrap;
-            gap: 2px;
-            align-items: center;
-            padding: 2px;
-            border-radius: 4px;
-        }
+/* ===== PAGE SYSTEM ===== */
+#editor-wrapper {
+    height: calc(100vh - 90px);
+    overflow-y: auto;
+    padding: 30px;
+}
 
-        .custom-toolbar-group.active-group {
-            display: flex !important; /* Force visible */
-        }
+.page {
+    width: 210mm;
+    min-height: 297mm;
+    background: white;
+    margin: 20px auto;
+    padding: 20mm;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    position: relative;
+}
 
-        .custom-toolbar-group button {
-            margin: 0;
-            padding: 4px 8px;
-            border-radius: 3px;
-            color: #666;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            min-width: 24px;
-            text-align: center;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
+/* ===== COMMENTS ===== */
+#comments {
+    position: fixed;
+    right: 0;
+    top: 90px;
+    width: 250px;
+    height: calc(100vh - 90px);
+    background: #fafafa;
+    border-left: 1px solid #ccc;
+    overflow-y: auto;
+    padding: 10px;
+}
 
-        .custom-toolbar-group button:hover {
-            background-color: #f0f0f0;
-            color: #2b579a;
-        }
+.comment {
+    background: #fff;
+    border: 1px solid #ddd;
+    margin-bottom: 8px;
+    padding: 6px;
+    font-size: 12px;
+}
 
-        .custom-toolbar-group button.ql-active {
-            color: #2b579a;
-            background-color: #e6f0ff;
-            font-weight: bold;
-        }
+/* ===== DRAWING ===== */
+#draw-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
 
-        /* 4. The Editor "Paper" */
-        .workspace {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            justify-content: center;
-            padding: 30px;
-            background-color: #f3f3f3;
-        }
-
-        #editor-container {
-            width: 210mm;
-            min-height: 297mm;
-            background: white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            padding: 25mm 20mm;
-            box-sizing: border-box;
-            border: 1px solid #dcdcdc;
-            outline: none;
-        }
-
-        /* 5. Typography */
-        .ql-editor {
-            font-family: 'Calibri', 'Arial', sans-serif !important;
-            font-size: 11pt;
-            line-height: 1.5;
-            padding: 0;
-            color: #000;
-            min-height: 100%;
-        }
-
-        .ql-editor h1 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 16pt; font-weight: bold; color: #2b579a; }
-        .ql-editor h2 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 13pt; font-weight: bold; }
-        .ql-editor h3 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 12pt; font-weight: bold; }
-        
-        /* Fix for placeholder visibility */
-        .ql-editor.ql-blank::before {
-            color: #aaa;
-            font-style: normal;
-            content: attr(data-placeholder);
-            float: left;
-            height: 0;
-            pointer-events: none;
-        }
-    </style>
+/* ===== ZOOM ===== */
+#editor-wrapper {
+    transform-origin: top center;
+}
+</style>
 </head>
+
 <body>
 
-<!-- Ribbon Header -->
-<div class="word-header">
-    <div class="app-title">Maku's Scrolls 🦉</div>
+<!-- RIBBON -->
+<div class="ribbon">
+
     <div class="ribbon-tabs">
-        <span class="tab-btn active" data-tab="home">Home</span>
-        <span class="tab-btn" data-tab="insert">Insert</span>
-        <span class="tab-btn" data-tab="layout">Layout</span>
-        <span class="tab-btn" data-tab="review">Review</span>
+        <button class="tab active" data-tab="home">Home</button>
+        <button class="tab" data-tab="insert">Insert</button>
+        <button class="tab" data-tab="layout">Layout</button>
+        <button class="tab" data-tab="draw">Draw</button>
     </div>
-    <button id="save-btn" style="background: white; color: #2b579a; border: 1px solid #ccc; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">Save .docx</button>
+
+    <div class="ribbon-group active" data-group="home">
+        <button onclick="quill.format('bold', true)">B</button>
+        <button onclick="quill.format('italic', true)">I</button>
+        <button onclick="quill.format('underline', true)">U</button>
+
+        <select onchange="quill.format('align', this.value)">
+            <option value="">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+            <option value="justify">Justify</option>
+        </select>
+
+        <select onchange="quill.format('font', this.value)">
+            <option value="arial">Arial</option>
+            <option value="times-new-roman">Times</option>
+        </select>
+    </div>
+
+    <div class="ribbon-group" data-group="insert">
+        <button onclick="insertImage()">Image</button>
+        <button onclick="insertTable()">Table</button>
+        <button onclick="addComment()">Comment</button>
+    </div>
+
+    <div class="ribbon-group" data-group="layout">
+        <select onchange="setZoom(this.value)">
+            <option value="0.75">75%</option>
+            <option value="1" selected>100%</option>
+            <option value="1.25">125%</option>
+        </select>
+
+        <select onchange="setMargin(this.value)">
+            <option value="10mm">Narrow</option>
+            <option value="20mm" selected>Normal</option>
+            <option value="30mm">Wide</option>
+        </select>
+    </div>
+
+    <div class="ribbon-group" data-group="draw">
+        <button onclick="toggleDraw()">Toggle Draw</button>
+        <input type="color" onchange="ctx.strokeStyle=this.value">
+        <input type="range" min="1" max="10" onchange="ctx.lineWidth=this.value">
+    </div>
+
 </div>
 
-<!-- Toolbar Container -->
-<div class="toolbar-container" id="toolbar-container">
-    <!-- Buttons injected here -->
+<!-- EDITOR -->
+<div id="editor-wrapper">
+    <div id="page-container">
+        <div class="page">
+            <div id="editor"></div>
+            <canvas id="draw-layer"></canvas>
+        </div>
+    </div>
 </div>
 
-<!-- Workspace -->
-<div class="workspace">
-    <div id="editor-container"></div>
-</div>
+<!-- COMMENTS -->
+<div id="comments"></div>
 
-<!-- Scripts -->
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
 <script>
-    // 1. Configuration
-    const toolbarConfig = {
-        home: [
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ 'header': [1, 2, 3, false] }],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            [{ 'indent': '-1'}, { 'indent': '+1' }],
-            ['code-block'],
-            [{ 'color': [] }, { 'background': [] }],
-            ['clean']
-        ],
-        insert: [
-            ['link', 'image', 'video'],
-            ['blockquote'],
-            [{ 'script': 'sub'}, { 'script': 'super' }],
-            ['clean']
-        ],
-        layout: [
-            [{ 'align': [] }],
-            [{ 'indent': '-1'}, { 'indent': '+1' }],
-            [{ 'line-height': ['1', '1.15', '1.5', '2'] }],
-            [{ 'size': ['small', false, 'large', 'huge'] }],
-            ['clean']
-        ],
-        review: [
-            ['clean'],
-            [{ 'color': [] }],
-            [{ 'font': [] }],
-            ['bold', 'italic']
-        ]
+let quill = new Quill('#editor', {
+    theme: 'snow'
+});
+
+/* ===== TABS ===== */
+document.querySelectorAll(".tab").forEach(t => {
+    t.onclick = () => {
+        document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+        t.classList.add("active");
+
+        document.querySelectorAll(".ribbon-group").forEach(g => g.classList.remove("active"));
+        document.querySelector(`[data-group="${t.dataset.tab}"]`).classList.add("active");
     };
+});
 
-    // Icons mapping
-    const icons = {
-        'bold': 'B', 'italic': 'I', 'underline': 'U', 'strike': 'S',
-        'clean': '🧹', 'code-block': '</>', 'blockquote': '"',
-        'link': '🔗', 'image': '🖼️', 'video': '▶️',
-        'ordered': '1.', 'bullet': '•', 'header': 'H',
-        'indent': '⇥', 'align': '≡', 'size': 'A', 'font': 'Aa'
-    };
+/* ===== IMAGE ===== */
+function insertImage() {
+    let url = prompt("Image URL");
+    if (url) quill.insertEmbed(quill.getSelection(true).index, 'image', url);
+}
 
-    // 2. Helper to create a button
-    function createButton(format, value, label) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        // We use a custom class to avoid Quill's internal styling conflicts
-        btn.className = `custom-btn ql-${format}`;
-        if (value && value !== true) {
-            btn.dataset.value = value;
+/* ===== TABLE ===== */
+function insertTable() {
+    let html = "<table border='1' style='width:100%;border-collapse:collapse'>";
+    for (let i=0;i<3;i++){
+        html+="<tr>";
+        for (let j=0;j<3;j++){
+            html+="<td contenteditable='true' style='padding:5px'></td>";
         }
-        
-        // Set content
-        if (label) {
-            btn.innerHTML = `<span>${label}</span>`;
-        } else if (icons[format]) {
-            btn.innerHTML = `<span>${icons[format]}</span>`;
-        } else {
-            btn.innerHTML = `<span>${format}</span>`;
-        }
-
-        // Click handler
-        btn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation(); // Stop bubbling
-            
-            // Update active state visually
-            document.querySelectorAll('.custom-toolbar-group button').forEach(b => b.classList.remove('ql-active'));
-            btn.classList.add('ql-active');
-
-            if (format === 'header') {
-                quill.format('header', value || false);
-            } else if (format === 'list') {
-                quill.format('list', value === 'ordered' ? 'ordered' : 'bullet');
-            } else if (format === 'align') {
-                quill.format('align', value === 'left' ? false : value);
-            } else if (format === 'size') {
-                quill.format('size', value || false);
-            } else if (format === 'color' || format === 'background') {
-                // Placeholder for color picker logic
-                // In a real app, you'd use a color picker library
-                const color = prompt(`Enter hex color for ${format}:`, '#000000');
-                if(color) quill.format(format, color);
-            } else if (format === 'link') {
-                const url = prompt('Enter URL:', 'https://');
-                if(url) quill.format('link', url);
-            } else if (format === 'image') {
-                const url = prompt('Enter image URL:', 'https://');
-                if(url) quill.format('image', url);
-            } else if (format === 'video') {
-                const url = prompt('Enter video URL:', 'https://');
-                if(url) quill.format('video', url);
-            } else {
-                quill.format(format, true);
-            }
-        };
-        return btn;
+        html+="</tr>";
     }
+    html+="</table><p><br></p>";
+    quill.clipboard.dangerouslyPasteHTML(quill.getLength(), html);
+}
 
-    // 3. Helper to create a group
-    function createToolbarGroup(name, options) {
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'custom-toolbar-group';
-        groupDiv.id = `group-${name}`;
+/* ===== COMMENTS ===== */
+let comments = [];
 
-        options.forEach(item => {
-            if (Array.isArray(item)) {
-                const key = Object.keys(item)[0];
-                const values = item[key];
+function addComment() {
+    let text = prompt("Comment:");
+    if (!text) return;
 
-                if (key === 'header') {
-                    values.forEach(v => groupDiv.appendChild(createButton('header', v, v === false ? '' : v)));
-                } else if (key === 'list') {
-                    ['ordered', 'bullet'].forEach(type => groupDiv.appendChild(createButton('list', type, type === 'ordered' ? '1.' : '•')));
-                } else if (key === 'align') {
-                    ['left', 'center', 'right', 'justify'].forEach(a => groupDiv.appendChild(createButton('align', a, a === 'left' ? '⬅️' : (a === 'center' ? '↔️' : (a === 'right' ? '➡️' : '≡')))));
-                } else if (key === 'size') {
-                    values.forEach(s => groupDiv.appendChild(createButton('size', s, s === false ? 'N' : (s === 'small' ? 'S' : (s === 'large' ? 'L' : 'H')))));
-                } else if (key === 'font') {
-                    groupDiv.appendChild(createButton('font', 'serif', 'Aa'));
-                } else if (key === 'color' || key === 'background') {
-                    groupDiv.appendChild(createButton(key, null, key === 'color' ? '🎨' : '🖌️'));
-                }
-            } else {
-                // Simple button
-                groupDiv.appendChild(createButton(item, true, null));
-            }
-        });
+    comments.push(text);
+    renderComments();
+}
 
-        return groupDiv;
-    }
+function renderComments() {
+    document.getElementById("comments").innerHTML =
+        comments.map(c => `<div class='comment'>${c}</div>`).join("");
+}
 
-    // 4. Initialize Quill
-    var quill = new Quill('#editor-container', {
-        theme: 'snow',
-        modules: { toolbar: false }, // We build our own
-        placeholder: 'The Chronicles of Animalandia\n\nWelcome to the archives of Maku. Here lies the history of the Lion King, the Snow Leopard, and the tales of the wolves Lupus and Grevan.\n\nWhat riddle shall we solve today?'
-    });
+/* ===== ZOOM ===== */
+function setZoom(z) {
+    document.getElementById("editor-wrapper").style.transform = `scale(${z})`;
+}
 
-    // 5. Build and Inject Toolbar Groups
-    const toolbarContainer = document.getElementById('toolbar-container');
-    
-    Object.keys(toolbarConfig).forEach(key => {
-        const group = createToolbarGroup(key, toolbarConfig[key]);
-        toolbarContainer.appendChild(group);
-        console.log(`Created group: ${key} with ${toolbarConfig[key].length} items`);
-    });
+/* ===== MARGINS ===== */
+function setMargin(m) {
+    document.querySelector(".page").style.padding = m;
+}
 
-    // 6. Activate "Home" by default
-    const homeGroup = document.getElementById('group-home');
-    if(homeGroup) {
-        homeGroup.classList.add('active-group');
-    }
+/* ===== DRAWING ===== */
+let canvas = document.getElementById("draw-layer");
+let ctx = canvas.getContext("2d");
+let drawing = false;
+let drawMode = false;
 
-    // 7. Tab Switching Logic
-    const tabs = document.querySelectorAll('.tab-btn');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Update Tab UI
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
+function resizeCanvas() {
+    let rect = document.querySelector(".page").getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    canvas.style.width = rect.width + "px";
+    canvas.style.height = rect.height + "px";
+}
+resizeCanvas();
 
-            const targetTab = tab.dataset.tab;
-            
-            // Hide all groups
-            document.querySelectorAll('.custom-toolbar-group').forEach(g => g.classList.remove('active-group'));
-            
-            // Show target group
-            const targetGroup = document.getElementById(`group-${targetTab}`);
-            if (targetGroup) {
-                targetGroup.classList.add('active-group');
-            } else {
-                console.error(`Group for ${targetTab} not found!`);
-            }
-        });
-    });
+window.onresize = resizeCanvas;
 
-    // 8. Save Functionality
-    document.getElementById('save-btn').addEventListener('click', function() {
-        var htmlContent = quill.root.innerHTML;
-        var fullHtml = `
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="utf-8"><title>Maku's Scrolls</title>
-            <style>body{font-family:'Calibri',sans-serif;font-size:11pt;line-height:1.5;margin:0;padding:25mm 20mm;color:#000;}
-            h1{font-size:16pt;font-weight:bold;color:#2b579a;}h2{font-size:13pt;font-weight:bold;}h3{font-size:12pt;font-weight:bold;}
-            .maku-footer{text-align:center;font-family:'Times New Roman',serif;font-style:italic;color:#888;font-size:10pt;margin-top:50px;border-top:1px solid #eee;padding-top:10px;}</style>
-            </head><body>${htmlContent}<div class="maku-footer">Archived by Maku | Animalandia</div></body></html>
-        `;
-        try {
-            var converted = htmlDocx.asBlob(fullHtml);
-            saveAs(converted, 'Maku_Scrolls_Animalandia.docx');
-            console.log("Saved!");
-        } catch (e) {
-            alert("Error saving: " + e.message);
-            console.error(e);
-        }
-    });
+function toggleDraw() {
+    drawMode = !drawMode;
+    canvas.style.pointerEvents = drawMode ? "auto" : "none";
+}
+
+canvas.onmousedown = e => {
+    if (!drawMode) return;
+    drawing = true;
+    ctx.beginPath();
+    ctx.moveTo(e.offsetX, e.offsetY);
+};
+
+canvas.onmousemove = e => {
+    if (!drawing || !drawMode) return;
+    ctx.lineTo(e.offsetX, e.offsetY);
+    ctx.stroke();
+};
+
+canvas.onmouseup = () => drawing = false;
+
+/* ===== EXPORT ===== */
+function exportDocx() {
+    let html = `
+    <html><body>${quill.root.innerHTML}</body></html>`;
+    let blob = htmlDocx.asBlob(html);
+    saveAs(blob, "document.docx");
+}
 </script>
 
 </body>

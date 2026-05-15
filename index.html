@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦉</text></svg>">
     <title>Maku's Scrolls - Light Word Editor</title>
     <!-- Quill CSS -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
@@ -11,19 +12,19 @@
         @import url('https://fonts.googleapis.com/css2?family=Calibri:wght@400;700&family=Arial&display=swap');
 
         body {
-            background-color: #f3f3f3; /* Word's classic desktop gray */
+            background-color: #f3f3f3;
             font-family: 'Calibri', 'Arial', sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
             flex-direction: column;
             height: 100vh;
-            overflow: hidden; /* Prevent body scroll, let editor scroll */
+            overflow: hidden;
         }
 
         /* 2. The "Ribbon" Header */
         .word-header {
-            background-color: #2b579a; /* Word Blue */
+            background-color: #2b579a;
             color: white;
             padding: 0 20px;
             height: 40px;
@@ -48,13 +49,24 @@
             opacity: 0.9;
         }
 
+        .ribbon-tabs span {
+            cursor: pointer;
+            padding: 5px 0;
+            transition: opacity 0.2s;
+        }
+
         .ribbon-tabs span:hover {
             opacity: 1;
             text-decoration: underline;
-            cursor: pointer;
         }
 
-        /* 3. The Toolbar Area (Below Ribbon) */
+        .ribbon-tabs span.active {
+            opacity: 1;
+            border-bottom: 3px solid white;
+            text-decoration: none;
+        }
+
+        /* 3. The Toolbar Area */
         .toolbar-container {
             background: white;
             border-bottom: 1px solid #dcdcdc;
@@ -62,19 +74,26 @@
             display: flex;
             justify-content: center;
             gap: 15px;
+            min-height: 50px; /* Prevent jumping */
         }
 
-        /* Customizing Quill Buttons to look flatter and cleaner */
         .ql-toolbar.ql-snow {
             border: none !important;
             padding: 0 !important;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 2px;
         }
         
         .ql-toolbar button {
-            margin-right: 5px;
+            margin: 0;
             padding: 4px 8px;
             border-radius: 3px;
             color: #666;
+            background: none;
+            border: none;
+            cursor: pointer;
         }
 
         .ql-toolbar button:hover {
@@ -98,17 +117,16 @@
         }
 
         #editor-container {
-            width: 210mm; /* A4 Width */
-            min-height: 297mm; /* A4 Height */
+            width: 210mm;
+            min-height: 297mm;
             background: white;
             box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            padding: 25mm 20mm; /* Standard Word Margins */
+            padding: 25mm 20mm;
             box-sizing: border-box;
             border: 1px solid #dcdcdc;
-            position: relative;
         }
 
-        /* 5. Typography Enforcement */
+        /* 5. Typography */
         .ql-editor {
             font-family: 'Calibri', 'Arial', sans-serif !important;
             font-size: 11pt;
@@ -120,45 +138,30 @@
         .ql-editor h1 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 16pt; font-weight: bold; color: #2b579a; }
         .ql-editor h2 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 13pt; font-weight: bold; }
         .ql-editor h3 { font-family: 'Calibri', 'Arial', sans-serif !important; font-size: 12pt; font-weight: bold; }
-        
-        /* Maku's Signature Watermark/Header effect */
-        .maku-header {
-            text-align: center;
-            font-family: 'Times New Roman', serif;
-            font-style: italic;
-            color: #888;
-            font-size: 10pt;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
     </style>
 </head>
 <body>
 
-<!-- 1. The Ribbon Header -->
+<!-- Ribbon Header -->
 <div class="word-header">
     <div class="app-title">Maku's Scrolls 🦉</div>
     <div class="ribbon-tabs">
-        <span>Home</span>
-        <span>Insert</span>
-        <span>Layout</span>
-        <span>Review</span>
+        <span class="tab-btn active" data-tab="home">Home</span>
+        <span class="tab-btn" data-tab="insert">Insert</span>
+        <span class="tab-btn" data-tab="layout">Layout</span>
+        <span class="tab-btn" data-tab="review">Review</span>
     </div>
     <button id="save-btn" style="background: white; color: #2b579a; border: 1px solid #ccc; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">Save .docx</button>
 </div>
 
-<!-- 2. The Toolbar -->
+<!-- Toolbar -->
 <div class="toolbar-container">
     <div id="toolbar-container"></div>
 </div>
 
-<!-- 3. The Workspace -->
+<!-- Workspace -->
 <div class="workspace">
-    <div id="editor-container">
-        <!-- Maku's Personal Touch -->
-        <div class="maku-header">Recorded by Maku, Keeper of Riddles & Archives | Animalandia 🦉</div>
-    </div>
+    <div id="editor-container"></div>
 </div>
 
 <!-- Scripts -->
@@ -167,30 +170,121 @@
 <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 
 <script>
-    // Initialize Quill with custom toolbar container
+    // 1. Define Toolbar Configurations for Each Tab
+    const toolbarOptions = {
+    home: [
+        ['bold', 'italic', 'underline', 'strike'],       // Text formatting
+        [{ 'header': [1, 2, 3, false] }],                // Headers
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],    // Lists
+        [{ 'indent': '-1'}, { 'indent': '+1' }],         // Indent
+        ['code-block'],                                  // <--- ADDED: Code Block button
+        [{ 'color': [] }, { 'background': [] }],         // Colors
+        ['clean']
+    ],
+    insert: [
+        ['link', 'image', 'video'],                      // <--- ADDED: Link, Image, Video
+        ['blockquote'],                                  // <--- ADDED: Blockquote
+        [{ 'script': 'sub'}, { 'script': 'super' }],     // Sub/Superscript
+        ['clean']
+    ],
+    layout: [
+        [{ 'align': [] }],                               // Alignment
+        [{ 'indent': '-1'}, { 'indent': '+1' }],         // Indentation
+        [{ 'line-height': ['1', '1.15', '1.5', '2'] }], // Line Height
+        [{ 'size': ['small', false, 'large', 'huge'] }], // Font Size
+        ['clean']
+    ],
+    review: [
+        ['clean'],
+        [{ 'color': [] }],                               // Highlight
+        [{ 'font': [] }],                                // Font Family
+        ['bold', 'italic']
+    ]
+};
+
+    // 2. Initialize Quill
     var quill = new Quill('#editor-container', {
         theme: 'snow',
         modules: {
-            toolbar: '#toolbar-container'
+            toolbar: toolbarOptions.home // Default to Home tab
         },
-        placeholder: 'Begin your chronicle here...'
+        placeholder: 'The Chronicles of Animalandia\n\nWelcome to the archives of Maku. Here lies the history of the Lion King, the Snow Leopard, and the tales of the wolves Lupus and Grevan.\n\nWhat riddle shall we solve today?'
     });
 
-    // Set initial content with Maku's header already styled
-    // Note: We keep the header div separate from the editable content if desired, 
-    // but here we let the user edit everything for flexibility.
-    const initialContent = `
-        <h1>The Chronicles of Animalandia</h1>
-        <p>Welcome to the archives of <strong>Maku</strong>. Here lies the history of the Lion King, the Snow Leopard, and the tales of the wolves Lupus and Grevan.</p>
-        <p><em>What riddle shall we solve today?</em></p>
-    `;
-    quill.root.innerHTML = initialContent;
+    // 3. Tab Switching Logic
+    const tabs = document.querySelectorAll('.tab-btn');
+    const toolbarDiv = document.getElementById('toolbar-container');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update Visual Active State
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Get the tab name
+            const tabName = tab.dataset.tab;
+
+            // Update Toolbar
+            // We must destroy the old toolbar module and create a new one with the new config
+            quill.getModule('toolbar').container.innerHTML = ''; // Clear existing buttons
+            
+            // Re-initialize toolbar with new config
+            quill.theme.modules.toolbar = new quill.theme.modules.Toolbar(toolbarOptions[tabName]);
+            quill.theme.modules.toolbar.bind();
+            
+            // Note: Quill doesn't have a simple "setToolbar" method, so we rebuild the DOM elements
+            // This is a workaround to swap the buttons dynamically
+            toolbarDiv.innerHTML = '';
+            const newToolbar = document.createElement('div');
+            newToolbar.className = 'ql-toolbar ql-snow';
+            
+            // Rebuild buttons based on config
+            toolbarOptions[tabName].forEach(group => {
+                const groupDiv = document.createElement('span');
+                group.forEach(button => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    if (Array.isArray(button)) {
+                        const label = Object.keys(button);
+                        const value = button[label];
+                        if (label === 'header') {
+                            value.forEach((h, i) => {
+                                const hBtn = document.createElement('button');
+                                hBtn.className = `ql-header ${h === false ? '' : h}`;
+                                hBtn.innerHTML = h === false ? '<span></span>' : `<span>${h}</span>`;
+                                hBtn.onclick = () => quill.format('header', h || false);
+                                groupDiv.appendChild(hBtn);
+                            });
+                        } else if (label === 'list') {
+                            ['ordered', 'bullet'].forEach(type => {
+                                const lBtn = document.createElement('button');
+                                lBtn.className = `ql-${type}`;
+                                lBtn.onclick = () => quill.format('list', type === 'ordered' ? 'ordered' : 'bullet');
+                                groupDiv.appendChild(lBtn);
+                            });
+                        }
+                        // Add more complex logic here if needed for other dropdowns
+                    } else {
+                        btn.className = `ql-${button}`;
+                        btn.onclick = () => quill.format(button, true);
+                        groupDiv.appendChild(btn);
+                    }
+                });
+                newToolbar.appendChild(groupDiv);
+            });
+
+            toolbarDiv.appendChild(newToolbar);
+            
+            // Re-bind the toolbar module to the new elements
+            quill.theme.modules.toolbar = new quill.theme.modules.Toolbar(newToolbar);
+            quill.theme.modules.toolbar.bind();
+        });
+    });
 
     // Save Functionality
     document.getElementById('save-btn').addEventListener('click', function() {
         var htmlContent = quill.root.innerHTML;
         
-        // Construct a full HTML document for the converter
         var fullHtml = `
             <!DOCTYPE html>
             <html>
@@ -198,27 +292,11 @@
                 <meta charset="utf-8">
                 <title>Maku's Scrolls</title>
                 <style>
-                    body {
-                        font-family: 'Calibri', 'Arial', sans-serif;
-                        font-size: 11pt;
-                        line-height: 1.5;
-                        margin: 0;
-                        padding: 25mm 20mm;
-                        color: #000;
-                    }
+                    body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 1.5; margin: 0; padding: 25mm 20mm; color: #000; }
                     h1 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 16pt; font-weight: bold; color: #2b579a; }
                     h2 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 13pt; font-weight: bold; }
                     h3 { font-family: 'Calibri', 'Arial', sans-serif; font-size: 12pt; font-weight: bold; }
-                    .maku-footer {
-                        text-align: center;
-                        font-family: 'Times New Roman', serif;
-                        font-style: italic;
-                        color: #888;
-                        font-size: 10pt;
-                        margin-top: 50px;
-                        border-top: 1px solid #eee;
-                        padding-top: 10px;
-                    }
+                    .maku-footer { text-align: center; font-family: 'Times New Roman', serif; font-style: italic; color: #888; font-size: 10pt; margin-top: 50px; border-top: 1px solid #eee; padding-top: 10px; }
                 </style>
             </head>
             <body>

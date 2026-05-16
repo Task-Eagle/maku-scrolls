@@ -2,152 +2,407 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word-Style Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maku's Scrolls - Animalandia Edition</title>
 
 <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
 
 <style>
+/* ===== THEME COLORS ===== */
+:root {
+    --maku-gold: #D4AF37;
+    --maku-cream: #F5E6D3;
+    --maku-brown: #8B4513;
+    --maku-dark: #3E2723;
+    --maku-accent: #C9A227;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
-    font-family: Calibri, Arial;
-    background: #e5e5e5;
-    overflow: hidden;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--maku-cream);
+    overflow-x: hidden;
+}
+
+/* ===== HEADER ===== */
+.header {
+    background: linear-gradient(135deg, var(--maku-dark), var(--maku-brown));
+    color: var(--maku-gold);
+    padding: 12px 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+}
+
+.header .subtitle {
+    font-size: 0.8rem;
+    opacity: 0.9;
+    margin-top: 4px;
 }
 
 /* ===== RIBBON ===== */
 .ribbon {
-    background: #f3f3f3;
-    border-bottom: 1px solid #ccc;
+    background: var(--maku-cream);
+    border-bottom: 2px solid var(--maku-gold);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .ribbon-tabs {
     display: flex;
-    background: #2b579a;
-    color: white;
+    background: var(--maku-dark);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.ribbon-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .ribbon-tabs button {
-    padding: 10px 15px;
+    flex: 1;
+    min-width: 60px;
+    padding: 14px 12px;
     border: none;
     background: transparent;
-    color: white;
+    color: var(--maku-gold);
     cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.ribbon-tabs button:hover {
+    background: rgba(212, 175, 55, 0.2);
 }
 
 .ribbon-tabs button.active {
-    background: white;
-    color: #2b579a;
+    background: var(--maku-gold);
+    color: var(--maku-dark);
     font-weight: bold;
+    border-radius: 4px 4px 0 0;
 }
 
 .ribbon-group {
     display: none;
-    padding: 8px;
-    gap: 10px;
-    align-items: center;
+    padding: 12px 16px;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    background: white;
 }
 
 .ribbon-group.active {
     display: flex;
 }
 
-/* ===== PAGE SYSTEM ===== */
-#editor-wrapper {
-    height: calc(100vh - 90px);
-    overflow-y: auto;
-    padding: 30px;
+/* ===== BUTTONS ===== */
+.ribbon-group button,
+.ribbon-group select {
+    padding: 12px 16px;
+    border: 2px solid var(--maku-gold);
+    background: white;
+    color: var(--maku-dark);
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 8px;
+    min-width: 48px;
+    min-height: 48px;
+    transition: all 0.2s;
 }
 
+.ribbon-group button:hover {
+    background: var(--maku-gold);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.ribbon-group select {
+    min-width: 120px;
+}
+
+/* ===== EDITOR WRAPPER ===== */
+#editor-wrapper {
+    min-height: calc(100vh - 180px);
+    overflow-y: auto;
+    padding: 20px 16px;
+    background: linear-gradient(to bottom, var(--maku-cream), #E8DCC4);
+}
+
+/* ===== PAGE ===== */
 .page {
+    max-width: 100%;
     width: 210mm;
     min-height: 297mm;
     background: white;
-    margin: 20px auto;
-    padding: 20mm;
-    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    margin: 0 auto 30px;
+    padding: 25mm;
+    box-shadow: 0 4px 20px rgba(62, 39, 35, 0.2);
     position: relative;
+    border-radius: 4px;
+    border: 1px solid var(--maku-gold);
 }
 
-/* ===== COMMENTS ===== */
-#comments {
+/* Scroll parchment effect */
+.page::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        transparent,
+        transparent 2px,
+        rgba(212, 175, 55, 0.03) 2px,
+        rgba(212, 175, 55, 0.03) 4px
+    );
+    pointer-events: none;
+    border-radius: 4px;
+}
+
+/* ===== QUILL EDITOR ===== */
+.ql-container {
+    font-size: 16px;
+    min-height: 200px;
+}
+
+.ql-editor {
+    font-family: 'Georgia', serif;
+    line-height: 1.6;
+    padding: 0;
+}
+
+/* ===== COMMENTS PANEL ===== */
+#comments-panel {
     position: fixed;
     right: 0;
-    top: 90px;
-    width: 250px;
-    height: calc(100vh - 90px);
-    background: #fafafa;
-    border-left: 1px solid #ccc;
+    top: 180px;
+    width: 280px;
+    max-width: 80vw;
+    height: calc(100vh - 180px);
+    background: var(--maku-cream);
+    border-left: 3px solid var(--maku-gold);
     overflow-y: auto;
-    padding: 10px;
+    padding: 16px;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 90;
+}
+
+#comments-panel.open {
+    transform: translateX(0);
+}
+
+#comments-toggle {
+    position: fixed;
+    right: 16px;
+    top: 180px;
+    background: var(--maku-dark);
+    color: var(--maku-gold);
+    border: none;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    z-index: 91;
+    font-size: 1rem;
 }
 
 .comment {
-    background: #fff;
-    border: 1px solid #ddd;
-    margin-bottom: 8px;
-    padding: 6px;
-    font-size: 12px;
+    background: white;
+    border-left: 4px solid var(--maku-gold);
+    margin-bottom: 12px;
+    padding: 12px;
+    font-size: 0.9rem;
+    border-radius: 0 8px 8px 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-/* ===== DRAWING ===== */
+.comment-header {
+    font-weight: bold;
+    color: var(--maku-brown);
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+}
+
+/* ===== DRAW LAYER ===== */
 #draw-layer {
     position: absolute;
     top: 0;
     left: 0;
     pointer-events: none;
+    border-radius: 4px;
 }
 
-/* ===== ZOOM ===== */
-#editor-wrapper {
-    transform-origin: top center;
+/* ===== EXPORT BAR ===== */
+.export-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--maku-dark);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    z-index: 100;
+}
+
+.export-bar button {
+    background: var(--maku-gold);
+    color: var(--maku-dark);
+    border: none;
+    padding: 14px 24px;
+    font-size: 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    min-width: 140px;
+}
+
+.export-bar button:hover {
+    background: white;
+    transform: scale(1.05);
+}
+
+/* ===== MOBILE OPTIMIZATIONS ===== */
+@media (max-width: 768px) {
+    .header h1 {
+        font-size: 1.2rem;
+    }
+    
+    .ribbon-tabs button {
+        padding: 12px 8px;
+        font-size: 0.85rem;
+    }
+    
+    .ribbon-group button,
+    .ribbon-group select {
+        padding: 14px 18px;
+        font-size: 1.1rem;
+        min-width: 56px;
+        min-height: 56px;
+    }
+    
+    .page {
+        width: 100%;
+        padding: 15mm;
+        margin: 0 auto 20px;
+    }
+    
+    #comments-panel {
+        width: 100%;
+        max-width: 100vw;
+        height: 50vh;
+        bottom: 0;
+        top: auto;
+        transform: translateY(100%);
+    }
+    
+    #comments-panel.open {
+        transform: translateY(0);
+    }
+    
+    #comments-toggle {
+        top: auto;
+        bottom: 60px;
+    }
+    
+    .export-bar {
+        flex-direction: column;
+        padding: 8px;
+    }
+    
+    .export-bar button {
+        width: 100%;
+    }
+}
+
+/* ===== OWL DECORATION ===== */
+.owl-deco {
+    position: fixed;
+    bottom: 80px;
+    right: 16px;
+    font-size: 2rem;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 50;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes scrollUnroll {
+    from { opacity: 0; transform: scaleY(0.95); }
+    to { opacity: 1; transform: scaleY(1); }
+}
+
+.page {
+    animation: scrollUnroll 0.4s ease-out;
 }
 </style>
 </head>
 
 <body>
 
+<!-- HEADER -->
+<div class="header">
+    <h1>🦉 Maku's Scrolls</h1>
+    <div class="subtitle">Ancient Archives of Animalandia</div>
+</div>
+
 <!-- RIBBON -->
 <div class="ribbon">
-
     <div class="ribbon-tabs">
-        <button class="tab active" data-tab="home">Home</button>
-        <button class="tab" data-tab="insert">Insert</button>
-        <button class="tab" data-tab="layout">Layout</button>
-        <button class="tab" data-tab="draw">Draw</button>
+        <button class="tab active" data-tab="home">✏️ Home</button>
+        <button class="tab" data-tab="insert">➕ Insert</button>
+        <button class="tab" data-tab="layout">📐 Layout</button>
+        <button class="tab" data-tab="draw">🎨 Draw</button>
     </div>
 
     <div class="ribbon-group active" data-group="home">
-        <button onclick="quill.format('bold', true)">B</button>
-        <button onclick="quill.format('italic', true)">I</button>
-        <button onclick="quill.format('underline', true)">U</button>
-
-        <select onchange="quill.format('align', this.value)">
-            <option value="">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-            <option value="justify">Justify</option>
+        <button onclick="quill.format('bold', true)" title="Bold">B</button>
+        <button onclick="quill.format('italic', true)" title="Italic">I</button>
+        <button onclick="quill.format('underline', true)" title="Underline">U</button>
+        
+        <select onchange="quill.format('align', this.value)" title="Alignment">
+            <option value="">⬅️ Left</option>
+            <option value="center">↔️ Center</option>
+            <option value="right">➡️ Right</option>
+            <option value="justify">≣ Justify</option>
         </select>
 
-        <select onchange="quill.format('font', this.value)">
+        <select onchange="quill.format('font', this.value)" title="Font">
+            <option value="georgia">Georgia</option>
             <option value="arial">Arial</option>
             <option value="times-new-roman">Times</option>
         </select>
     </div>
 
     <div class="ribbon-group" data-group="insert">
-        <button onclick="insertImage()">Image</button>
-        <button onclick="insertTable()">Table</button>
-        <button onclick="addComment()">Comment</button>
+        <button onclick="insertImage()" title="Add Image">🖼️</button>
+        <button onclick="insertTable()" title="Add Table">📊</button>
+        <button onclick="addComment()" title="Add Comment">💬</button>
     </div>
 
     <div class="ribbon-group" data-group="layout">
-        <select onchange="setZoom(this.value)">
+        <select onchange="setZoom(this.value)" title="Zoom">
             <option value="0.75">75%</option>
             <option value="1" selected>100%</option>
             <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
         </select>
 
-        <select onchange="setMargin(this.value)">
+        <select onchange="setMargin(this.value)" title="Margins">
             <option value="10mm">Narrow</option>
             <option value="20mm" selected>Normal</option>
             <option value="30mm">Wide</option>
@@ -155,25 +410,36 @@ body {
     </div>
 
     <div class="ribbon-group" data-group="draw">
-        <button onclick="toggleDraw()">Toggle Draw</button>
-        <input type="color" onchange="ctx.strokeStyle=this.value">
-        <input type="range" min="1" max="10" onchange="ctx.lineWidth=this.value">
+        <button onclick="toggleDraw()" title="Toggle Drawing Mode">✏️ Toggle</button>
+        <input type="color" onchange="ctx.strokeStyle=this.value" title="Pen Color">
+        <input type="range" min="1" max="10" onchange="ctx.lineWidth=this.value" title="Brush Size">
     </div>
-
 </div>
 
 <!-- EDITOR -->
 <div id="editor-wrapper">
-    <div id="page-container">
-        <div class="page">
-            <div id="editor"></div>
-            <canvas id="draw-layer"></canvas>
-        </div>
+    <div class="page">
+        <div id="editor"></div>
+        <canvas id="draw-layer"></canvas>
     </div>
 </div>
 
-<!-- COMMENTS -->
-<div id="comments"></div>
+<!-- COMMENTS TOGGLE -->
+<button id="comments-toggle" onclick="toggleComments()">💬 Scrolls</button>
+
+<!-- COMMENTS PANEL -->
+<div id="comments-panel">
+    <h3 style="margin-top:0; color:var(--maku-dark);">📜 Marginalia</h3>
+    <div id="comments"></div>
+</div>
+
+<!-- EXPORT BAR -->
+<div class="export-bar">
+    <button onclick="exportDocx()">📥 Save as Document</button>
+</div>
+
+<!-- OWL DECORATION -->
+<div class="owl-deco">🦉</div>
 
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
@@ -181,7 +447,11 @@ body {
 
 <script>
 let quill = new Quill('#editor', {
-    theme: 'snow'
+    theme: 'snow',
+    modules: {
+        toolbar: false
+    },
+    placeholder: 'Begin your scroll, wise scribe...'
 });
 
 /* ===== TABS ===== */
@@ -197,17 +467,17 @@ document.querySelectorAll(".tab").forEach(t => {
 
 /* ===== IMAGE ===== */
 function insertImage() {
-    let url = prompt("Image URL");
-    if (url) quill.insertEmbed(quill.getSelection(true).index, 'image', url);
+    let url = prompt("Enter the image's mystical URL:");
+    if (url) quill.insertEmbed(quill.getSelection(true)?.index || 0, 'image', url);
 }
 
 /* ===== TABLE ===== */
 function insertTable() {
-    let html = "<table border='1' style='width:100%;border-collapse:collapse'>";
+    let html = "<table style='width:100%;border-collapse:collapse;margin:16px 0'>";
     for (let i=0;i<3;i++){
         html+="<tr>";
         for (let j=0;j<3;j++){
-            html+="<td contenteditable='true' style='padding:5px'></td>";
+            html+="<td style='padding:12px;border:1px solid #8B4513;background:#F5E6D3'>📜</td>";
         }
         html+="</tr>";
     }
@@ -219,21 +489,34 @@ function insertTable() {
 let comments = [];
 
 function addComment() {
-    let text = prompt("Comment:");
+    let text = prompt("Maku's marginal note:");
     if (!text) return;
 
-    comments.push(text);
+    comments.push({
+        text: text,
+        date: new Date().toLocaleDateString()
+    });
     renderComments();
 }
 
 function renderComments() {
     document.getElementById("comments").innerHTML =
-        comments.map(c => `<div class='comment'>${c}</div>`).join("");
+        comments.map((c, i) => `
+            <div class='comment'>
+                <div class='comment-header'>Note ${i+1} • ${c.date}</div>
+                <div>${c.text}</div>
+            </div>
+        `).join("") || "<p style='color:#8B4513;font-style:italic'>No marginalia yet...</p>";
+}
+
+function toggleComments() {
+    document.getElementById("comments-panel").classList.toggle("open");
 }
 
 /* ===== ZOOM ===== */
 function setZoom(z) {
     document.getElementById("editor-wrapper").style.transform = `scale(${z})`;
+    document.getElementById("editor-wrapper").style.transformOrigin = "top center";
 }
 
 /* ===== MARGINS ===== */
@@ -256,34 +539,36 @@ function resizeCanvas() {
 }
 resizeCanvas();
 
-window.onresize = resizeCanvas;
+window.addEventListener('resize', resizeCanvas);
 
 function toggleDraw() {
     drawMode = !drawMode;
     canvas.style.pointerEvents = drawMode ? "auto" : "none";
+    alert(drawMode ? "🎨 Drawing mode activated! Maku approves." : "✏️ Drawing mode deactivated.");
 }
 
-canvas.onmousedown = e => {
+canvas.addEventListener('mousedown', e => {
     if (!drawMode) return;
     drawing = true;
     ctx.beginPath();
     ctx.moveTo(e.offsetX, e.offsetY);
-};
+});
 
-canvas.onmousemove = e => {
+canvas.addEventListener('mousemove', e => {
     if (!drawing || !drawMode) return;
     ctx.lineTo(e.offsetX, e.offsetY);
     ctx.stroke();
-};
+});
 
-canvas.onmouseup = () => drawing = false;
+canvas.addEventListener('mouseup', () => drawing = false);
+canvas.addEventListener('mouseleave', () => drawing = false);
 
 /* ===== EXPORT ===== */
 function exportDocx() {
     let html = `
-    <html><body>${quill.root.innerHTML}</body></html>`;
+    <html><head><meta charset="UTF-8"></head><body>${quill.root.innerHTML}</body></html>`;
     let blob = htmlDocx.asBlob(html);
-    saveAs(blob, "document.docx");
+    saveAs(blob, "Maku_Scroll_" + new Date().toISOString().slice(0,10) + ".docx");
 }
 </script>
 
